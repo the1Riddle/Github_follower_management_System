@@ -31,8 +31,18 @@ fetch_all_users() {
 # Fetch all followers and following users
 FOLLOWERS=($(fetch_all_users "https://api.github.com/users/$GITHUB_USERNAME/followers"))
 FOLLOWING=($(fetch_all_users "https://api.github.com/users/$GITHUB_USERNAME/following"))
+KEEP_USERS=()
 
-# Finds and follow back user that are following
+if [[ -f "keepme.txt" ]]; then
+  while read -r USERNAME; do
+    USERNAME="$(echo "$USERNAME" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    [[ -z "$USERNAME" ]] && continue
+    [[ "$USERNAME" == --* ]] && continue
+    KEEP_USERS+=("$USERNAME")
+  done < "keepme.txt"
+fi
+
+# Finds and follow back users that are following
 for USERNAME in "${FOLLOWERS[@]}"; do
   if [[ ! " ${FOLLOWING[@]} " =~ " ${USERNAME} " ]]; then
     curl -s -L \
@@ -46,7 +56,7 @@ done
 
 # Finds and unfollow users who aint following back
 for USERNAME in "${FOLLOWING[@]}"; do
-  if [[ ! " ${FOLLOWERS[@]} " =~ " ${USERNAME} " ]]; then
+  if [[ ! " ${FOLLOWERS[@]} " =~ " ${USERNAME} " ]] && [[ ! " ${KEEP_USERS[@]} " =~ " ${USERNAME} " ]]; then
     curl -s -L \
       -X DELETE \
       -H "Accept: application/vnd.github+json" \
