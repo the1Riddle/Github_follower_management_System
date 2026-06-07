@@ -1,0 +1,9 @@
+-- add GitHub user handles of those you would like to follow
+-- but it's not a must that they follow back. 
+-- note that these users won't be followed automatically, but
+-- if you follow them, they won't be unfollowed when they don't
+-- follow back.
+--
+-- Add them in this format:
+rezzcode
+torvalds
