@@ -3,6 +3,9 @@
 # GitHub username and token
 GITHUB_USERNAME="${GITHUB_USERNAME}"
 USAGE_TOKEN="${USAGE_TOKEN}"
+MIN_NON_FORK_REPOS="${MIN_NON_FORK_REPOS:-5}"
+
+source "$(dirname "$0")/repository_criteria.sh"
 
 # Function to fetch all pages of users
 fetch_all_users() {
@@ -32,6 +35,23 @@ fetch_all_users() {
 FOLLOWERS=($(fetch_all_users "https://api.github.com/users/$GITHUB_USERNAME/followers"))
 FOLLOWING=($(fetch_all_users "https://api.github.com/users/$GITHUB_USERNAME/following"))
 KEEP_USERS=()
+declare -A USER_REPO_CRITERIA_CACHE=()
+
+user_meets_repo_criteria() {
+  local username=$1
+
+  if [[ -n "${USER_REPO_CRITERIA_CACHE[$username]+x}" ]]; then
+    return "${USER_REPO_CRITERIA_CACHE[$username]}"
+  fi
+
+  if has_minimum_non_fork_repos "$username" "$MIN_NON_FORK_REPOS"; then
+    USER_REPO_CRITERIA_CACHE[$username]=0
+  else
+    USER_REPO_CRITERIA_CACHE[$username]=1
+  fi
+
+  return "${USER_REPO_CRITERIA_CACHE[$username]}"
+}
 
 if [[ -f "keepme.txt" ]]; then
   while read -r USERNAME; do
@@ -44,7 +64,7 @@ fi
 
 # Finds and follow back users that are following
 for USERNAME in "${FOLLOWERS[@]}"; do
-  if [[ ! " ${FOLLOWING[@]} " =~ " ${USERNAME} " ]]; then
+  if [[ ! " ${FOLLOWING[@]} " =~ " ${USERNAME} " ]] && user_meets_repo_criteria "$USERNAME"; then
     curl -s -L \
       -X PUT \
       -H "Accept: application/vnd.github+json" \
@@ -56,7 +76,7 @@ done
 
 # Finds and unfollow users who aint following back
 for USERNAME in "${FOLLOWING[@]}"; do
-  if [[ ! " ${FOLLOWERS[@]} " =~ " ${USERNAME} " ]] && [[ ! " ${KEEP_USERS[@]} " =~ " ${USERNAME} " ]]; then
+  if [[ ! " ${KEEP_USERS[@]} " =~ " ${USERNAME} " ]] && { [[ ! " ${FOLLOWERS[@]} " =~ " ${USERNAME} " ]] || ! user_meets_repo_criteria "$USERNAME"; }; then
     curl -s -L \
       -X DELETE \
       -H "Accept: application/vnd.github+json" \
